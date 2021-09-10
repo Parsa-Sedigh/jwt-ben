@@ -9,9 +9,12 @@ export class User extends BaseEntity {
     id: number;
 
     @Field()
-    @Column()
+    @Column()// todo: should pass 'text' to this decorator
     email: string;
 
-    @Column()
+    @Column('text')// todo: should pass 'text' to this decorator
     password: string;
+
+    @Column('int', {default: 0})
+    tokenVersion: number;
 }

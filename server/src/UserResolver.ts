@@ -1,18 +1,27 @@
-import {Arg, Ctx, Field, Mutation, ObjectType, Query, Resolver, UseMiddleware} from "type-graphql";
+import {Arg, Ctx, Field, Int, Mutation, ObjectType, Query, Resolver, UseMiddleware} from "type-graphql";
 import {User} from "./entity/User";
 import {compare, hash} from "bcryptjs";
 import {MyContext} from "./MyContext";
 import {createAccessToken, createRefreshToken} from "./auth";
 import {isAuth} from "./isAuth";
+import {sendRefreshToken} from "./sendRefreshToken";
+import {getConnection} from "typeorm";
 
 @ObjectType()
 class LoginResponse {
     @Field()
-    accessToken: string
+    accessToken: string;
+    @Field(() => User)
+    user: User;
 }
 
 @Resolver()
 export class UserResolver {
+    @Query(() => String)
+    hello() {
+        return "hi!";
+    }
+
     @Query(() => String)
     @UseMiddleware(isAuth)
     bye(@Ctx() {payload}: MyContext) {
@@ -60,10 +69,17 @@ export class UserResolver {
         }
 
         // If we made it this far, it means the login was successful
-        res.cookie('jid', createRefreshToken(user), {httpOnly: true});
+        sendRefreshToken(res, createRefreshToken(user))
 
         return {
-            accessToken: createAccessToken(user)
+            accessToken: createAccessToken(user),
+            user
         };
+    }
+
+    @Mutation(() => Boolean)
+    async revokeRefreshTokensForUser(@Arg('userId', () => Int) userId: number) {
+        await getConnection().getRepository(User).increment({id: userId}, 'tokenVersion', 1);
+        return true;
     }
 }
