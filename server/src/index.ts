@@ -11,6 +11,7 @@ import {verify} from "jsonwebtoken";
 import {User} from "./entity/User";
 import {createAccessToken, createRefreshToken} from "./auth";
 import {sendRefreshToken} from "./sendRefreshToken";
+import cors from 'cors';
 
 // createConnection().then(async connection => {
 //
@@ -33,6 +34,11 @@ import {sendRefreshToken} from "./sendRefreshToken";
 (async () => {
     const app = express();
 
+    app.use(cors({
+        origin: 'http://localhost:3000',
+        credentials: true,
+
+    }));
     app.use(cookieParser());
 
     // app.get('/', (req, res) => res.send('hello'));
@@ -85,7 +91,7 @@ import {sendRefreshToken} from "./sendRefreshToken";
         }),
         context: ({req, res}: MyContext) => ({req, res})
     } as any);
-    apolloServer.applyMiddleware({app});
+    apolloServer.applyMiddleware({app, cors: false});
     app.listen(4000, () => {
         console.log('express server started');
     });

@@ -583,14 +583,252 @@ to component prop of a <Route /> in Routes.tsx and with that, for example, we ca
 it.
 Now create users.graphql and then(after writing it's query), run npm run gen which is gonna create useUsersQuery() .
 
-Passing fetchPoliciy: 'network-only' to a generated graphql query means that it is not gonna read from the cache, instead, is going to make a request
+Passing fetchPolicy: 'network-only' to a generated graphql query means that it is not gonna read from the cache, instead, is going to make a request
 to our server EVERY TIME and this way, we don't need to worry about updating the cache.
 
 Whenever you use map() on array in react in jsx, pass a key prop to each element and each one should have a unique value.
 So now we can see all of our users in home page.
 
 Now we want to take one of these users and login with it.
-TODO: till 1:57:40*/
+After creating the login.graphql file and writing it's mutation, we wanna generate the hook for it, so run: npm run gen.
+
+It's good to click on the generated graphql file whenever I generate the types, because vscode caches the types, so it doesn't always update unless
+we click on that file and then it does and that also help us get auto completion. Now use that generated hook in Login page.
+
+Now currently, after Login, if it was successful, it gives us the accessToken, but let's make refreshToken working as well.
+
+Tip: For clearing cookies in Application tab, you can click on the top button.
+
+Currently, after login, no cookies would set, for that, in network tab, look for a request with POST method and in the Response Headers section,
+we should see a Set Cookie, but we don't, why?
+There are few things we need to do to get this working. First, we need to set credentials property of ApolloClient() to 'include'.
+
+Currently we have a problem with CORS which says:
+Access to fetch at 'http://localhost:4000/graphql' from origin 'http://localhost:3000' has been blocked by CORS policy: Response to preflight request
+doesn't pass access control check: The value of the 'Access-Control-Allow-Origin' header in the response mut not be the wildcard '*' when the request's
+credentials mode is 'include'.
+So the default value for Access-Control-Allow-Origin is *.
+
+In above error, the first string is the server we're trying to access(in this case http://localhost:4000/graphql is the server) and the second string is
+we(the origin). So the current CORS value is * and this occurs when we set credentials to 'include'.
+To fix this, go to index.ts in server.
+By default, apollo will do CORS for us but it's easier set up if we just ignore the CORS that apollo gives us, we can do this in where we have
+apolloServer.applyMiddleware() and set cors to false in the object we pass to it. NOW, we can add CORS OURSELVES.
+For this, install cors package on server which is an express middleware and also install the types package for it. Then apply that middleware in index.ts .
+By setting credentials: true in object we pass to app.use(cors()), that way, we can send back our cookie.
+The error we're getting is because the origin is set to * currently and instead, it should be http://localhost:3000 , also note the http:// part is crucial.
+How could we know if we mess the origin property value up?
+You would get the same error with a different and it is the value of Access-Control-Allow-Origin that is sending request to server. So if you put the wrong
+<x>, the value in error for Access-Control-Allow-Origin would be <x>.
+
+What is the right origin?
+Just copy the value for origin in the error and put in for origin property of cors() middleware. So in case of our error, we should put
+the second string which is http://localhost:3000 . So basically whatever the url for our frontend website is, that's what we wanna set as origin
+property of cors() middleware.
+
+Now when we login, we should get the cookie back.
+Now if you see the Response Headers in network tab of login request, you don't see the Set Cookie, but in Application>Cookies tab, you do see the
+cookie showed up with name of jid.
+So the cookie showed up but we just don't see a header. For whatever reason, sometimes chrome shows the header, sometimes it doesn't.
+So our refreshToken is in our browser, also we have access to accessToken. So one token is in a cookie and one, we're gonna use and set in a variable.
+
+Note: Make sure you use the cors() middleware at the VERY BEGINNING of the codes. So defenitly make sure you use it before apolloServer.applyMiddleware() .
+
+With all these settings, the cookie should getting set.
+
+Now we know that we can login and get an accessToken, now, we wanna use that accessToken and send it up in the header whenever we make reqs.
+
+For example the bye request requires you to be logged in to access and we have to send an Authorization header to get that to work.
+
+Now let's create a hook for bye. So create a graphql file for it and then run npm gen to generate types and hook for it.
+
+So if Bye query works, it means we're logged in nad if it doesn't work, that means we're not logged in.
+
+Now we wanna send the accessToken in header of reqs. First step is to actually store the accessToken somewhere, so create a file named accessToken.ts and
+there we would have a global variable that we can access the accessToken from.
+
+Now after we login, we need to set that accessToken variable, but it isn't possible to just set it from outside of that file, so instead, let's create
+a function named setAccessToken() to do that. So we just export that function and let the accessToken variable itself be private to that file.
+So it's still gonna be a KIND OF a global variable, we just have functions that wrap it now to set and access it.
+
+After storing it in a variable, we need to send it in a header. To do this, in index.ts of client, go to new ApolloClient() and we say:
+on each req, we have access to an arg by passing a function to request property and we set the authorization header.
+
+Now when we login and then after that, make a graphql req, we're gonna read the accessToken in index.tsx and we set the authorization header and
+it's gonna sent with the request. Now for testing this, you can login and then go to the /bye page.
+
+Now when we refresh the page, because we're storing the accessToken in just a variable, it's gonna go away. So if you're currently logged in and
+in /bye and then hit refresh, you get an error and can't access the data of that bye request.
+So what we're gonna do is when the page first loads, we're gonna try refreshing our token to get a new accessToken. So the user stays logged in even
+when they refresh the page.
+For that, create a new comp named App and what it's gonna do is to render the Routes component. Now in index.tsx , instead of rendering <Routes />
+we render the <App />
+
+By setting credentials: 'include' in the object we pass as second arg of fetch() , we can receive a new cookie.
+
+So the idea is before the app renders, we're gonna display: loading... ,then when it's displaying that, we're gonna try to refresh the token
+and then after it's done that, we set setLoading(false), and then we load the <Routes /> which currently is our entire app!
+
+Now if you refresh, it's gonna display: loading... and then it's gonna display <Routes /> and we're gonna login and we're gonna get a new
+accessToken.
+So now we're persisting the user between refreshes.
+Recap: Before we render our application, we're sending a request to server(/refresh_token) and basically we're sending a refreshToken to get a
+new accessToken and with this new accessToken we're then just setting it with setAccessToken() in App.tsx , before we load our app(<Routes /> comp).
+If you delete your refresh token and refresh the page, you get error in a request that wants accessToken.
+
+Now we're gonna handle the case where our accessToken has expired and we may not refresh the page but we're just kinda browing the website(client side
+rendering), the accessToken has expired and then we try making a request, we don't want the user to be logged out.
+For seeing how this happens, in createAccessToken() let's set the expiresIn to 15s.
+
+By passing fetch-policy: 'netwrok-only' to a graphql hook, it means every that request is sent(like in Bye.tsx , everytime we visit that page),
+it's just gonna make a new request.
+Now login, now browse the website and watch the network tab, after 15seconds the token is expired and then after making a req, we get error.
+So you can just kinda clicking back and forth between the links in website(client side routing) until it's been 15seconds and then our token is
+expired and if you try to make a req, you get an error.
+The user should never exprience this, tt should just seamlessly refresh in the background.
+
+We want to check if the token has expired and if it has, we want to get a new one before we do the request. For help us, we use
+apollo-link-token-refresh library and to use this libarry, we create a link and we need to pass this link to ApolloLink.from() and to
+be able to do this, we need to migrate off of apollo-boost. Currently, we're using apollo-boost to create our ApolloClient in index.tsx ,
+so we're no longer can use apollo-boost , because we need to have a special link.
+So follow the guide on: https://www.apollographql.com/docs/react/v2/migrating/boost-migration/ then go to advanced migration and then `after` section
+and copy it's code and paste it in index.tsx .
+We're not gonna use apollo-link-state , so remove it. All the new imports were automatically installed for us when we installed apollo-boost.
+
+You don't need to pass settings to InMemoryCache() . Also you can remove the request function, because we already wrote our own.
+The only reason we have that requestLink, is because we wanna set the context.
+
+Now we have the equivalent of non-apollo-boost version of creating the client and in object we pass to ApolloClient, we're creating a new link(not
+a custom one) based off of catching errors and requestLink which is really just setting a header and the HttpLink() which is gonna
+actually do the request for us and we also pass in the cache.
+Now on top of this, we can add the apollo-link-token-refresh library. So the whole point of doing that is that we can now add that library and copy
+the logic of that libarry and paste it as first elements of from() in our code.
+This library is writter in ts, so we're gonna get types and we don't need to do anything else for it.
+
+Inside try block of isTokenValidOrUndefined() function in index.tsx , we need to decode the token so we need to install jwt-decode then import it at
+index.tsx and also install it's type package.
+
+With jwtDecode() , we can get the payload of the token which is sth that's automatically added to the payload for us, is when the token expires and
+that's of the form `exp` and we can destructure it with this name.
+If current time is greater than that exp * 1000, it means we passed when the token has expired, so now it is invalid. So we return false in that function
+which means token is not valid, otherwise the token is still valid, so we return true.
+
+With fetchAccessToken() fucntion, we get the new accessToken , but for us, we already wrote that in App.tsx , so we can copy our code without the .then() or
+.catch() .
+
+The handleFetch() , is gonna read the accessToken from the response, now to be able to read it, we have to pass in what our field name is? . So add a
+new property to object we pass to TokenRefreshToken() named accessTokenField.
+In handleFetch() we have access to accessToken and we just need to set the accessToken.
+
+There's nothing we need to do in handleResponse() , so I commented it out.
+
+Now for testing, clear the refreshToken from application tab(so we have no accessToken and we have no refreshToken) and login again.
+Watch the netwrok tab, after 15s, we're gonna refresh the accessToken when I try to making a req. So for example after 15s, if you go
+to bye page to make a req, you will also make a req to /refresh_token and we can see that it sends us back a accessToken.
+So to user perspecitve, they have no idea that this is hapenning, so we do this thing in background whenever the token has expired, we refresh
+a new one for them and so they can just go on using the sire and making reqs and we handle the case where we need to make an extra req to get
+the new accessToken for them. So now currently, by navigating in website, every 15s, we need to get a new accessToken(with our other req).
+So that is what our link is doing which is, it checks if the token is valid or not, if it's not valid in isTokenValidOrUndefined function,
+if it's not valid, it's gonna call that fetchAccessToken function and get a new accessToken for us and then it's gonna set that accessToken in
+handleFetch() and then that accessToken is used in the req itself and that's how we're able to continue using the site with it.
+
+We're pretty much done with persisting the user's session. So when they refresh the page, they're gonna stay logged in and as they use the
+application, they're gonna be kept in the same session and we're just refresh in the background.
+
+So you can set your accessToken back to 15m now.
+So now we check to refresh the token every 15 minutes.
+
+handleError() in index.tsx gets called whenever it tries to fetch an accessToken and that endpoint we specified for fetch() in fetchAccessToken()
+sends back an error. But in our particular access point(in /refresh_token of server), the way we made it is we don't throw errors back, instead
+we just send back an empty accessToken. So if your app sends back an error, that handleError() will be called. In our case this function is really
+not gonna ever be called unless the server is totally down.
+
+Remember that token refresh link logic(new TokenRefreshLink({}) which has isTokenValidOrUndefined() function) gets called on every graphql req
+to check whether the token is invalid.
+
+2:38:10
+How to fetch the user?
+2 ways:
+1) One way we can do this is by reading the token in frontend.
+The way we set this up, ben doesn't particulary like it, because we have that accessToken variable(although it has a get and set function) in a global
+variable, so accessing that variable in react is kind of could run into problems, because whenever the accessToken changes, it doesn't cause the
+react application to re-render.
+Now if I wanted to go with this approach and read the information from the accessToken which is in accessToken.ts , it's good to stick this to a
+state management library, so you know when the token has changed and it causes the react to re-render and you get the new data.
+But I'm not gonna do that in this case, instead,2) we're gonna request the data from server, so we're gonna make a apollo query called `me` and we're gonna
+get the current user that way.
+So both ways work.
+
+So we can read the user data from a token or just get the data from server, because maybe you don't want to put this data inside of a token,
+because note all the dat inside jwt is accessible, it's public.
+For method 2, first create a new query in UserResolver.ts and name it `me`.
+
+When passing () => User, {} to @Query() , it means it's gonna return a User or null . So to allow us to send back null responses we can say: comma
+and then {nullable: true}
+
+Now on frontend, create a graphql file for a new query. Then in graphql playground create a new query and then copy it's code to that new file.
+Now generate the types and hook for this by running npm run gen .
+Create a comp named Header.
+
+Currently, after logging in, after a succesful login, the header doesn't update and it still shows: not logged in.
+So we just need apollo know that we have a user now.
+For fixing this, to login() function in Login.tsx , pass update property and ... . But currently, on backend and in login, we're not
+returning a user, because we need that information to update the current user in frontend. So on server we need to send back the current user on login.
+So in UserResolver and in LoginResponse, add the info that is needed on frontend and then in login query, add the new data(user object) to returning object.
+
+Now in login.graphql , add:
+user {
+    id
+    email
+}
+
+
+Now we need to re-run the npm run gen, because we made some changes to one of it's files.
+
+Sth you wanna make sure you do when you update the apollo cache(so passing update property to result of a mutation hook like useLoginMutation()),
+is that all the same fields that you're getting when you for example login the user, you're also fetching in the related gralphql file. So in case
+of `me` query, we have id and email fields in graphql file and for login.graphql we have also id and email, so they MATCH.
+
+To test, first clear the refreshToken then hit refresh, then login.
+For getting good auto-completion and catching errors when using writeQuery() , you can use generics for writeQuery() to check the structure of
+the object we pass to data property against the generic type of writeQuery() .
+
+Now as we login, it displayes the current user and not 'not logged in' anymore.
+
+Now anywhere that we want to display the user, we just use useMeQuery() hook. But remember to look WHEN you wanna use fetchPolicy: 'notwork-only', because
+this property with this value won't utilize the cache but what you get apollo to do is cache the result of meQuery, so you can use it all over your
+application and then it only sends one req to the server. So I commented it.
+We use this option with that value for testing and then instead of this option, we can update the cache with apollo.
+
+Now we wanna log the user out.
+When we remove the refreshToken from client, the user can't make auhtorized reqs anymore(we also need to clear the accessToken as well).
+
+We wanna create an endpoint on our server to clear that refreshToken cookie. Because that is an http-only cookie, we can't access
+it through our website or in react, we have to remove it ON OUR SERVER.
+So create a new @Mutation() in UserResolver and in there, we wanna send a refreshToken which is empty(similar to login, but empty) and that will
+log the user out.
+We COULD also res.clearCookie() will send back an empty cookie and it will expire it right away, so this is another option.
+But it's good to use sendRefreshToken() because then we make sure we're creating the cookie with the same name(in this case jid) and same attributes and
+all that matches. So by calling this @Mutation(), it will clear the refreshToken out for us.
+
+Whenever you're using apollo, it's also a good idea to reset the store(clear the cache) whenever you log the user out(after clearing the refreshToken
+and accessToken).
+So for this, we can use the second param of useLogoutMutation() which is an object and it's client property, get us access to apollo-client .
+
+You can assume sth is defined in TS by putting an ! at the end of it.
+
+Now after logging out, the value of refreshToken would be empty(but it's name is still present in application/cookies tab) and accessToken is empty
+and cache is cleared.
+
+Now I want to set the Path of our refreshToken. The reason for doing this, is currently every req we send, we're sending our refreshToken with it.
+You can see the cookie value on the network tab/<the req>, but in firefox/network/<req>/Request headers/Cookie property , you can see that we're sending
+a cookie named jid there.
+We only want to send the refreshToken up, whenever the user goes to refresh their acessToken. We can do that by modifying path on our cookie.
+So go to sendRefreshToken() on server and set path: '/refresh_token'. Now for test, get a new refreshToken.
+What this will do, is now when we try to send a req, we don't see a Cookie key on Request headers at all. But if you now refresh the page,
+we send a req to refresh_token , we can see our Cookie(with a key named jid) is being sent in the request header.
+What Path is doing, is it's restricting and we only send the refreshToken when we wanna refresh it(accessToken).
+*/
 
 
 

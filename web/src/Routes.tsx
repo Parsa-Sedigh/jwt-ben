@@ -6,6 +6,8 @@ import {useHelloQuery} from './generated/graphql';
 import {Home} from './pages/Home';
 import {Login} from './pages/Login';
 import {Register} from './pages/Register';
+import {Bye} from "./pages/Bye";
+import {Header} from "./Header";
 
 export const Routes = () => {
     // const {data, loading} = useQuery(gql`
@@ -26,16 +28,13 @@ export const Routes = () => {
     return (
         <BrowserRouter>
             <div>
-                <header>
-                    <div><Link to='/'>Home</Link></div>
-                    <div><Link to='/register'>Register</Link></div>
-                    <div><Link to='/login'>Login</Link></div>
-                </header>
+                <Header />
 
                 <Switch>
                     <Route path="/" component={Home} exact/>
                     <Route path="/register" component={Register} exact/>
                     <Route path="/login" component={Login} exact/>
+                    <Route path="/bye" component={Bye} exact/>
                 </Switch>
             </div>
         </BrowserRouter>
